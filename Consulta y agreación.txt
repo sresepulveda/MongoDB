@@ -1,0 +1,100 @@
+// CONSULTAS JEFFERSON REMOLINA
+
+use("PedidosRestaurantesBD");
+
+//Obtener IDs para usar en las consultas
+const unUsuarioId = db.usuarios.findOne()._id;
+const unRestauranteId = db.restaurantes.findOne()._id;
+
+console.log(`ID de Usuario de Ejemplo: ${unUsuarioId}`);
+console.log(`ID de Restaurante de Ejemplo: ${unRestauranteId}`);
+
+
+
+// CONSULTAS BÁSICAS (Selección, Inserción, Actualización, Eliminación)
+
+//SELECCIÓN (READ)
+//Seleccionar un solo documento por ID.
+console.log("\n--- 1.1 SELECCIÓN: Encontrar un usuario por ID ---");
+db.usuarios.findOne({ _id: unUsuarioId });
+
+//  - Seleccionar todos los documentos en una colección. (Limitamos a 5)
+console.log("\n--- 1.1 SELECCIÓN: Encontrar los primeros 5 restaurantes ---");
+db.restaurantes.find().limit(5).pretty();
+
+
+//INSERCIÓN (CREATE)
+//Insertar un nuevo restaurante
+console.log("\n--- 1.2 INSERCIÓN: Nuevo restaurante de prueba ---");
+db.restaurantes.insertOne({
+    nombre: "Cafetería del Sol",
+    tipo_cocina: ["Café", "Postres"],
+    calificacion_promedio: 5.0,
+    loc: { type: "Point", coordinates: [-74.07, 4.60] },
+    menu: [{ nombre_item: "Latte", precio: 3.50 }]
+});
+
+//ACTUALIZACIÓN (UPDATE)
+//Actualizar el email de un usuario específico.
+console.log("\n--- 1.3 ACTUALIZACIÓN: Cambiar el email del usuario de prueba ---");
+db.usuarios.updateOne(
+    { _id: unUsuarioId },
+    { $set: { email: `nuevo.email.actualizado.${new Date().getTime()}@bigdata.com` } }
+);
+
+//ELIMINACIÓN (DELETE)
+//Eliminar el restaurante que acabamos de crear (buscamos por nombre).
+console.log("\n--- 1.4 ELIMINACIÓN: Eliminar el restaurante 'Cafetería del Sol' ---");
+db.restaurantes.deleteOne({ nombre: "Cafetería del Sol" });
+
+
+
+//CONSULTAS CON FILTROS Y OPERADORES
+
+
+//Filtro por un campo (igualdad en un array)
+console.log("\n--- 2.1 FILTROS: Restaurantes con Cocina 'Vegana' ---");
+db.restaurantes.find({
+    tipo_cocina: "Vegana"
+}).limit(3).pretty();
+
+//Operador de Rango ($gte)
+// Encontrar pedidos con un total mayor o igual a 20000 COP.
+console.log("\n--- 2.2 OPERADORES: Pedidos con TOTAL >= 20000 ---");
+db.pedidos.find({
+    total: { $gte: 20000 }
+}).sort({ total: -1 }).limit(5).pretty();
+
+//Operador Lógico ($and)
+// Encontrar restaurantes de cocina italiana y con calificación promedio mayor a 4.5.
+console.log("\n--- 2.3 OPERADORES LÓGICOS: Italiana Y Calificación > 4.5 ---");
+db.restaurantes.find({
+    $and: [
+        { tipo_cocina: "Italiana" },
+        { calificacion_promedio: { $gt: 4.5 } }
+    ]
+}).limit(5).pretty();
+
+
+//CONSULTAS DE AGREGACIÓN PARA ESTADÍSTICAS
+
+
+//Agregación: CONTAR ($match y $count)
+// Objetivo: Contar cuántos pedidos en total se han realizado en estado "Entregado".
+console.log("\n--- 3.1 AGREGACIÓN: Total de Pedidos Entregados ---\n");
+db.pedidos.aggregate([
+    { $match: { estado: "Entregado" } }, // Filtrar solo los entregados
+    { $count: "total_entregados" } // Contar los documentos restantes
+]);
+
+//Agregación: PROMEDIAR ($avg) y SUMAR ($sum)
+//Calcular el ingreso total y el promedio del total del pedido para toda la plataforma.
+console.log("\n--- 3.2 AGREGACIÓN: Ingreso Total y Promedio de Pedido ---\n");
+db.pedidos.aggregate([
+    { $group: {
+        _id: null, 
+        ingreso_total_plataforma: { $sum: "$total" },
+        promedio_pedido: { $avg: "$total" }
+    }},
+    { $project: { _id: 0, ingreso_total_plataforma: 1, promedio_pedido: { $round: ["$promedio_pedido", 2] } } } 
+]);

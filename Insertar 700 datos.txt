@@ -1,0 +1,141 @@
+// SCRIPT DE GENERACIÓN DE DATOS MASIVOS (SEEDER)
+// Total aproximado de 700 documentos
+
+use("PedidosRestaurantesBD");
+
+// Arrays para almacenar los IDs generados para referenciar
+let userIds = [];
+let restauranteIds = [];
+
+// Arrays de datos de prueba
+const userNames = ["Jefferson", "Steven", "Sofia", "Maria", "Alejandra", "Juan", "Esteban", "Alejandro", "Diego", "Victoria"];
+const streetNames = ["Carrera 7", "Calle 165", "Manzana 10", "Diagonal 22", "Avenida Caracas"];
+const cuisines = ["Mexicana", "Italiana", "Japonesa", "Vegana", "Hamburguesas", "Postres", "Asiática", "Pizzas"];
+const dishNames = ["Salchipapa", "Pizza", "Sushi", "Ensalada", "Hamburguesa Doble", "Helado", "Empanada", "Ceviche"];
+
+// Función de utilidad para obtener un elemento aleatorio de un array
+function getRandomItem(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Función de utilidad para obtener un número aleatorio entre min y max (inclusive)
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Función de utilidad para obtener una calificación aleatoria (1 a 5)
+function getRandomRating() {
+    return getRandomInt(1, 5);
+}
+
+
+
+// 1. GENERACIÓN E INSERCIÓN DE 100 USUARIOS
+console.log("Iniciando inserción de 100 usuarios...");
+const usersToInsert = [];
+for (let i = 0; i < 100; i++) {
+    const newId = new ObjectId();
+    userIds.push(newId);
+    const name = getRandomItem(userNames) + " " + (i + 1);
+    usersToInsert.push({
+        _id: newId,
+        nombre: name,
+        email: `usuario${i}@gmail.com`,
+        direcciones_guardadas: [
+            { alias: "Casa", calle: `${getRandomItem(streetNames)} ${getRandomInt(1, 100)}`, ciudad: "Bogota" }
+        ],
+        pedidos_recientes: []
+    });
+}
+db.usuarios.insertMany(usersToInsert);
+console.log("100 usuarios insertados.");
+
+
+// 2. GENERACIÓN E INSERCIÓN DE 100 RESTAURANTES
+console.log("Iniciando inserción de 100 restaurantes...");
+const restaurantsToInsert = [];
+for (let i = 0; i < 100; i++) {
+    const newId = new ObjectId();
+    restauranteIds.push(newId);
+    
+    // Generación de coordenadas aleatorias
+    const lat = 4.0 + (Math.random() * 1.5);
+    const long = -74.0 - (Math.random() * 1.5);
+    const cuisine1 = getRandomItem(cuisines);
+    let cuisine2 = getRandomItem(cuisines);
+    while(cuisine2 === cuisine1) { cuisine2 = getRandomItem(cuisines); }
+
+    restaurantsToInsert.push({
+        _id: newId,
+        nombre: `El Sabor de ${getRandomItem(cuisines)} ${i + 1}`,
+        direccion: `${getRandomItem(streetNames)} ${getRandomInt(1, 200)}`,
+        loc: {
+            type: "Point",
+            coordinates: [long, lat] // GeoJSON [long, lat]
+        },
+      
+        tipo_cocina: [cuisine1, cuisine2],
+        calificacion_promedio: getRandomRating(),
+        menu: [
+            { nombre_item: getRandomItem(dishNames), descripcion: "Plato principal 1", precio: getRandomInt(8000, 35000) }, // Precios simulados en COP
+            { nombre_item: getRandomItem(dishNames), descripcion: "Plato principal 2", precio: getRandomInt(6000, 20000) }
+        ],
+        ultimas_reseñas: [],
+       
+        horarios: { lunes: "10:00-22:00" }
+    });
+}
+db.restaurantes.insertMany(restaurantsToInsert);
+console.log("100 restaurantes insertados.");
+
+
+// 3. GENERACIÓN E INSERCIÓN DE 500 PEDIDOS (TRANSACCIONES)
+console.log("Iniciando inserción de 500 pedidos...");
+const ordersToInsert = [];
+for (let i = 0; i < 500; i++) {
+    const randomUserId = getRandomItem(userIds);
+    const randomRestauranteId = getRandomItem(restauranteIds);
+    const price1 = getRandomInt(10000, 25000);
+    const price2 = getRandomInt(5000, 15000);
+    const total = price1 + price2;
+    ordersToInsert.push({
+        usuario_id: randomUserId,
+        restaurante_id: randomRestauranteId,
+        fecha_pedido: new Date(Date.now() - getRandomInt(1000, 500000000)), // Fecha aleatoria en los últimos meses
+        estado: getRandomItem(["Entregado", "Entregado", "Entregado", "Pendiente"]),
+        items: [
+            { nombre: getRandomItem(dishNames), cantidad: 1, precio_unitario: price1 },
+            { nombre: getRandomItem(dishNames), cantidad: getRandomInt(1, 3), precio_unitario: price2 }
+        ],
+        total: total,
+        direccion_entrega: { calle: "Dirección de prueba", ciudad: "Metrópolis" },
+        calificacion: getRandomRating()
+    });
+}
+db.pedidos.insertMany(ordersToInsert);
+console.log("500 pedidos insertados. Total de 700 documentos insertados.");
+
+
+
+// 4. EJEMPLO DE CONSULTA DE ANÁLISIS EN MASA (Big Data)
+console.log("\n--- CONSULTA DE ANÁLISIS: Restaurante más popular ---\n");
+// Consulta de Agregación para encontrar el restaurante con más pedidos (JOIN + GROUP BY)
+db.pedidos.aggregate([
+    { $group: {
+        _id: "$restaurante_id",
+        total_pedidos: { $sum: 1 } 
+    }},
+    { $sort: { total_pedidos: -1 } },
+    { $limit: 1 },
+    { $lookup: {
+        from: "restaurantes", 
+        localField: "_id",     
+        foreignField: "_id",   
+        as: "info_restaurante" 
+    }},
+    { $project: {
+        _id: 0,
+        nombre_restaurante: { $arrayElemAt: ["$info_restaurante.nombre", 0] },
+        total_pedidos: 1
+    }}
+]).pretty();

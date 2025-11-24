@@ -1,0 +1,84 @@
+// 1. Crear la Base de Datos y usarla
+use("PedidosRestaurantesBD");
+
+
+// 2. INSERTAR UN USUARIO (Jefferson Remolina)
+const userId = new ObjectId("61b34e2c884c987654321001");
+
+db.usuarios.insertOne({
+    _id: userId,
+    nombre: "Jefferson Remolina",
+    email: "jeffersonremolina@gmail.com",
+    direcciones_guardadas: [
+        { 
+            alias: "Casa", 
+            calle: "carrera 10 # 160 - 28", 
+            ciudad: "bogota" 
+        }
+    ],
+    pedidos_recientes: []
+});
+
+
+// 3. INSERTAR UN RESTAURANTE COMPLETO (Pizzeria Sabrosura)
+const restauranteId = new ObjectId("61b34e2c884c987654321002");
+
+db.restaurantes.insertOne({
+    _id: restauranteId,
+    nombre: "Pizzeria Sabrosura de comida",
+    direccion: "Carrera 10 # 20-30",
+    latitud: 4.6097, 
+    longitud: -74.0721,
+    tipo_cocina: ["Italiana", "Pizzas"],
+    calificacion_promedio: 4.5,
+    menu: [
+        { 
+            nombre_item: "Pizza Especial Familiar", 
+            descripcion: "La pizza más popular de la casa", 
+            precio: 35000 
+        } // Precio en COP
+    ],
+    ultimas_reseñas: [
+       {
+            id_reseña: new ObjectId(),
+            usuario_nombre: "Jefferson Remolina",
+            calificacion: 5,
+            comentario: "¡La mejor pizza de Bogotá!"
+        }
+    ],
+    horarios: {
+        lunes: "10:00-22:00",
+        domingo: "10:00-22:00"
+    }
+});
+
+
+// 4. INSERCIÓN DE UN PEDIDO
+const pedidoId = new ObjectId();
+
+db.pedidos.insertOne({
+    _id: pedidoId,
+    usuario_id: userId,          // Referencia a Jefferson Remolina
+    restaurante_id: restauranteId, // Referencia a Pizzeria Sabrosura
+    fecha_pedido: new Date(),
+    estado: "Entregado",
+    items: [
+        { 
+            nombre: "Pizza Especial Familiar", 
+            cantidad: 1, 
+            precio_unitario: 35000 // 35000 COP
+        }
+    ],
+    total: 35000, 
+    direccion_entrega: {
+        calle: "carrera 10 # 160 - 28",
+        ciudad: "bogota"
+    }
+});
+
+
+// 5. ACTUALIZACIÓN: Añadir el nuevo pedido al historial del usuario
+db.usuarios.updateOne(
+    { _id: userId },
+    { $push: { pedidos_recientes: { $each: [pedidoId], $slice: -5 } } }
+);
